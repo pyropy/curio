@@ -4,7 +4,8 @@ import RPCCall from '/lib/jsonrpc.mjs';
 customElements.define('pdp-info', class PDPElement extends LitElement {
     static properties = {
         services: { type: Array },
-        keys: { type: Array },
+        ownerKeys: { type: Array },
+        beneficiaryKeys: { type: Array },
         showAddServiceForm: { type: Boolean },
         showAddKeyForm: { type: Boolean },
     }
@@ -12,7 +13,8 @@ customElements.define('pdp-info', class PDPElement extends LitElement {
     constructor() {
         super();
         this.services = [];
-        this.keys = [];
+        this.ownerKeys = [];
+        this.beneficiaryKeys = [];
         this.showAddServiceForm = false;
         this.showAddKeyForm = false;
         this.loadServices();
@@ -29,7 +31,8 @@ customElements.define('pdp-info', class PDPElement extends LitElement {
 
     async loadKeys() {
         try {
-            this.keys = await RPCCall('ListPDPKeys', []);
+            this.ownerKeys = await RPCCall('ListPDPKeys', ['pdp']);
+            this.beneficiaryKeys = await RPCCall('ListPDPKeys', ['pdp_beneficiary']);
         } catch (error) {
             console.error('Failed to load PDP keys:', error);
         }
@@ -106,12 +109,22 @@ customElements.define('pdp-info', class PDPElement extends LitElement {
             return;
         }
 
+
+        const roleInput = this.shadowRoot.getElementById('address-type');
+        const role = roleInput.value;
+
+        if (!role) {
+            alert('Please select an address type.');
+            return;
+        }
+
         try {
             // Call the RPC method to import the private key
-            const address = await RPCCall('ImportPDPKey', [privateKey]);
+            const address = await RPCCall('ImportPDPKey', [privateKey, role]);
 
             // Reset the form
             privateKeyInput.value = '';
+            roleInput.value = '';
 
             // Reload the keys
             await this.loadKeys();
@@ -126,15 +139,15 @@ customElements.define('pdp-info', class PDPElement extends LitElement {
         }
     }
 
-    async removeKey(ownerAddress) {
-        const confirmed = confirm(`Are you sure you want to remove the key for address "${ownerAddress}"?`);
+    async removeKey(address, role) {
+        const confirmed = confirm(`Are you sure you want to remove the key for address "${address}"?`);
         if (!confirmed) {
             return;
         }
 
         try {
             // Call the RPC method to remove the key
-            await RPCCall('RemovePDPKey', [ownerAddress]);
+            await RPCCall('RemovePDPKey', [address, role]);
 
             // Reload the keys
             await this.loadKeys();
@@ -189,6 +202,7 @@ customElements.define('pdp-info', class PDPElement extends LitElement {
                     ${this.showAddServiceForm ? 'Cancel' : 'Add PDP Service'}
                 </button>
 
+
                 ${this.showAddServiceForm ? html`
                     <form @submit="${this.addService}" style="margin-top: 20px;">
                         <div class="mb-3">
@@ -206,7 +220,7 @@ customElements.define('pdp-info', class PDPElement extends LitElement {
                 <hr>
 
                 <h2>Owner Addresses</h2>
-                ${this.keys.length > 0 ? html`
+                ${this.ownerKeys.length > 0 ? html`
                     <table class="table table-dark table-striped w-100">
                         <thead>
                             <tr>
@@ -215,11 +229,11 @@ customElements.define('pdp-info', class PDPElement extends LitElement {
                             </tr>
                         </thead>
                         <tbody>
-                            ${this.keys.map(key => html`
+                            ${this.ownerKeys.map(key => html`
                                 <tr>
                                     <td>${key}</td>
                                     <td>
-                                        <button class="btn btn-danger btn-sm" @click="${() => this.removeKey(key)}">
+                                        <button class="btn btn-danger btn-sm" @click="${() => this.removeKey(key, 'pdp')}">
                                             Remove
                                         </button>
                                     </td>
@@ -231,6 +245,32 @@ customElements.define('pdp-info', class PDPElement extends LitElement {
                     <p>No owner addresses available.</p>
                 `}
 
+                <h2>Beneficiary Addresses</h2>
+                ${this.ownerKeys.length > 0 ? html`
+                    <table class="table table-dark table-striped w-100">
+                        <thead>
+                            <tr>
+                                <th style="width: 90%;">Beneficiary Address</th>
+                                <th style="width: 10%;">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${this.ownerKeys.map(key => html`
+                                <tr>
+                                    <td>${key}</td>
+                                    <td>
+                                        <button class="btn btn-danger btn-sm" @click="${() => this.removeKey(key, 'pdp_beneficiary')}">
+                                            Remove
+                                        </button>
+                                    </td>
+                                </tr>
+                            `)}
+                        </tbody>
+                    </table>
+                ` : html`
+                    <p>No beneficiary addresses available.</p>
+                `}
+
                 <button class="btn btn-primary me-2" @click="${this.toggleAddKeyForm}">
                     ${this.showAddKeyForm ? 'Cancel' : 'Import Key'}
                 </button>
@@ -240,6 +280,13 @@ customElements.define('pdp-info', class PDPElement extends LitElement {
                         <div class="mb-3">
                             <label for="private-key" class="form-label">Private Key (Hex)</label>
                             <textarea class="form-control" id="private-key" rows="3" required></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label for="address-type" class="form-label">Address Type</label>
+                            <select class="form-control" id="address-type" required>
+                                <option value="pdp">Owner</option>
+                                <option value="pdp_beneficiary">Beneficiary</option>
+                            </select>
                         </div>
                         <button type="submit" class="btn btn-success">Import Key</button>
                     </form>

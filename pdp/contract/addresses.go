@@ -13,6 +13,7 @@ import (
 
 type PDPContracts struct {
 	PDPVerifier common.Address
+	SPRegistry  common.Address
 }
 
 func ContractAddresses() PDPContracts {
@@ -20,6 +21,7 @@ func ContractAddresses() PDPContracts {
 	case build.BuildCalibnet:
 		return PDPContracts{
 			PDPVerifier: common.HexToAddress("0x07074aDd0364e79a1fEC01c128c1EFfa19C184E9"),
+			SPRegistry:  common.HexToAddress("0x"),
 		}
 	case build.BuildMainnet:
 		// Compatible contract not yet deployed
